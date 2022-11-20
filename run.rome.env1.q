@@ -1,10 +1,10 @@
 #!/bin/bash --login
 #SBATCH -J mt-dgemm-icc
-#SBATCH -o o.%x.skl.%j
-#SBATCH -e e.%x.skl.%j
-#SBATCH --ntasks=40
-#SBATCH --ntasks-per-node=40 # tasks to run per node
-#SBATCH -p compute
+#SBATCH -o o.%x.rome.%j
+#SBATCH -e e.%x.rome.%j
+#SBATCH --ntasks=64
+#SBATCH --ntasks-per-node=64 # tasks to run per node
+#SBATCH -p xcompute_amd
 #SBATCH --time=00:15:00
 #SBATCH --exclusive
 #SBATCH -A scw1001
@@ -26,7 +26,41 @@ do
     echo "MKL Version: " $MKL_VERSION
 
     export OMP_NUM_THREADS=1
-    
+
+    case $MKL_VERSION in
+        2018.2)
+            unset MKL_CBWR
+            unset MKL_DEBUG_CPU_TYPE
+            unset MKL_ENABLE_INSTRUCTIONS
+
+            export MKL_CBWR=AVX2
+            export MKL_DEBUG_CPU_TYPE=5
+            #export MKL_ENABLE_INSTRUCTIONS=AVX2 # not defined in 2018.2
+          ;;
+        2020.0)
+            unset MKL_CBWR
+            unset MKL_DEBUG_CPU_TYPE
+            unset MKL_ENABLE_INSTRUCTIONS
+
+            export MKL_CBWR=AVX2
+            export MKL_DEBUG_CPU_TYPE=5
+            export MKL_ENABLE_INSTRUCTIONS=AVX2
+          ;;
+        2020.1)
+            unset MKL_CBWR
+            unset MKL_DEBUG_CPU_TYPE
+            unset MKL_ENABLE_INSTRUCTIONS
+
+            #export MKL_CBWR=AVX2# Used in 2020.2 but AVX2 causes "Illegal instruction" error
+            export MKL_DEBUG_CPU_TYPE=5 # not present in 2020.1
+            export MKL_ENABLE_INSTRUCTIONS=AVX2
+          ;;
+        *)
+            echo -n "unknown MKL version $MKL_VERSION"
+            exit 1
+          ;;
+    esac
+
     env | grep SCW
     env | grep MKL
     env
@@ -35,7 +69,7 @@ do
     #    setup paths     #
     ######################
     input_dir=$HOME/mkl-test/mt-dgemm/src
-    output_dir=$SLURM_SUBMIT_DIR/output.skl
+    output_dir=$SLURM_SUBMIT_DIR/output.rome/$MKL_VERSION
     code_src=mt-dgemm.c
     code_exe=mt-dgemm-icc
     make_file=Makefile.intel.hawk
@@ -83,6 +117,6 @@ do
     # check environment    #
     ########################
     export OMP_NUM_THREADS=64
-    ltrace -e getenv ./$code_exe $N 2>&1
+    ltrace -e getenv ./$code_exe 128 2>&1
 
 done

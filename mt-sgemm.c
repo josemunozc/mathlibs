@@ -1,9 +1,9 @@
-// void cblas_dgemm (
+// void cblas_sgemm (
 // const CBLAS_LAYOUT Layout, const CBLAS_TRANSPOSE transa, const CBLAS_TRANSPOSE transb,
 // const MKL_INT m, const MKL_INT n, const MKL_INT k,
-// const double alpha, const double *a, const MKL_INT lda,
-// const double *b, const MKL_INT ldb,
-// const double beta, double *c,
+// const float alpha, const float *a, const MKL_INT lda,
+// const float *b, const MKL_INT ldb,
+// const float beta, float *c,
 // const MKL_INT ldc);
 
 #include <stdio.h>
@@ -22,7 +22,7 @@
 #include "essl.h"
 #endif
 
-#define DGEMM_RESTRICT __restrict__
+#define SGEMM_RESTRICT __restrict__
 
 // ------------------------------------------------------- //
 // Function: get_seconds
@@ -55,8 +55,8 @@ int main(int argc, char* argv[]) {
 	int N = 256;
 	int repeats = 8;
 
-    	double alpha = 1.0;
-    	double beta  = 1.0;
+    	float alpha = 1.0;
+    	float beta  = 1.0;
 
 	if(argc > 1) {
 		N = atoi(argv[1]);
@@ -73,10 +73,10 @@ int main(int argc, char* argv[]) {
 			printf("Repeat multiply %d times.\n", repeats);
 
             if(argc > 3) {
-                alpha = (double) atof(argv[3]);
+                alpha = (float) atof(argv[3]);
 
                 if(argc > 4) {
-                    beta = (double) atof(argv[4]);
+                    beta = (float) atof(argv[4]);
                 }
             }
 		} else {
@@ -96,9 +96,9 @@ int main(int argc, char* argv[]) {
 
 	printf("Allocating Matrices...\n");
 
-	double* DGEMM_RESTRICT matrixA = (double*) malloc(sizeof(double) * N * N);
-	double* DGEMM_RESTRICT matrixB = (double*) malloc(sizeof(double) * N * N);
-	double* DGEMM_RESTRICT matrixC = (double*) malloc(sizeof(double) * N * N);
+	float* SGEMM_RESTRICT matrixA = (float*) malloc(sizeof(float) * N * N);
+	float* SGEMM_RESTRICT matrixB = (float*) malloc(sizeof(float) * N * N);
+	float* SGEMM_RESTRICT matrixC = (float*) malloc(sizeof(float) * N * N);
 
 	printf("Allocation complete, populating with values...\n");
 
@@ -121,19 +121,19 @@ int main(int argc, char* argv[]) {
 	// VENDOR NOTIFICATION: START MODIFIABLE REGION
 	//
 	// Vendor is able to change the lines below to call optimized
-	// DGEMM or other matrix multiplication routines. Do *NOT*
+	// SGEMM or other matrix multiplication routines. Do *NOT*
 	// change any lines above this statement.
 	// ------------------------------------------------------- //
 
-	double sum = 0;
+	float sum = 0;
 
 	// Repeat multiple times
 	for(r = 0; r < repeats; r++) {
 #if defined(USE_MKL) || defined(USE_CBLAS)
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             N, N, N, alpha, matrixA, N, matrixB, N, beta, matrixC, N);
 #elif USE_ESSL
-        dgemm("N", "N",
+        sgemm("N", "N",
             N, N, N, alpha, matrixA, N, matrixB, N, beta, matrixC, N);
 #else
 		#pragma omp parallel for private(sum)
@@ -163,8 +163,8 @@ int main(int argc, char* argv[]) {
 
 	printf("Calculating matrix check...\n");
 
-	double final_sum = 0;
-	double count     = 0;
+	float final_sum = 0;
+	float count     = 0;
 
 	#pragma omp parallel for reduction(+:final_sum, count)
 	for(i = 0; i < N; i++) {
@@ -174,8 +174,8 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	double N_dbl = (double) N;
-	double matrix_memory = (3 * N_dbl * N_dbl) * ((double) sizeof(double));
+	float N_dbl = (float) N;
+	float matrix_memory = (3 * N_dbl * N_dbl) * ((float) sizeof(float));
 
 	printf("\n");
 	printf("===============================================================\n");
@@ -190,8 +190,8 @@ int main(int argc, char* argv[]) {
 
 	// O(N**3) elements each with one add and three multiplies
     	// (alpha, beta and A_i*B_i).
-	const double flops_computed = (N_dbl * N_dbl * N_dbl * 2.0 * (double)(repeats)) +
-        (N_dbl * N_dbl * 2 * (double)(repeats));
+	const double flops_computed = (N_dbl * N_dbl * N_dbl * 2.0 * (float)(repeats)) +
+        (N_dbl * N_dbl * 2 * (float)(repeats));
 
 	printf("FLOPs computed:       %f\n", flops_computed);
 	printf("GFLOP/s rate:         %f GF/s\n", (flops_computed / time_taken) / 1000000000.0);
